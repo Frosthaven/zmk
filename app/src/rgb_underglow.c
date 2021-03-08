@@ -104,9 +104,46 @@ static struct led_rgb hsb_to_rgb(struct zmk_led_hsb hsb) {
 }
 
 static void zmk_rgb_underglow_effect_solid() {
+    /* PER KEY HACKING TIME
     for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
         pixels[i] = hsb_to_rgb(state.color);
     }
+    */
+
+    struct zmk_led_hsb hsb = state.color;
+    hsb.h = 220; // azure
+    hsb.s = 100;
+    hsb.b = 100;
+    pixels[10] = hsb_to_rgb(hsb);
+    pixels[16] = hsb_to_rgb(hsb);
+    pixels[17] = hsb_to_rgb(hsb);
+    pixels[18] = hsb_to_rgb(hsb);
+    pixels[19] = hsb_to_rgb(hsb);
+    pixels[20] = hsb_to_rgb(hsb);
+    pixels[21] = hsb_to_rgb(hsb);
+    pixels[22] = hsb_to_rgb(hsb);
+    pixels[23] = hsb_to_rgb(hsb);
+    pixels[24] = hsb_to_rgb(hsb);
+    pixels[25] = hsb_to_rgb(hsb);
+    pixels[26] = hsb_to_rgb(hsb);
+
+    hsb.h = 320; // rose
+
+    pixels[0] = hsb_to_rgb(hsb);
+    pixels[1] = hsb_to_rgb(hsb);
+    pixels[2] = hsb_to_rgb(hsb);
+    pixels[3] = hsb_to_rgb(hsb);
+    pixels[4] = hsb_to_rgb(hsb);
+    pixels[5] = hsb_to_rgb(hsb);
+    pixels[6] = hsb_to_rgb(hsb);
+    pixels[7] = hsb_to_rgb(hsb);
+    pixels[8] = hsb_to_rgb(hsb);
+    pixels[9] = hsb_to_rgb(hsb);
+    pixels[11] = hsb_to_rgb(hsb);
+    pixels[12] = hsb_to_rgb(hsb);
+    pixels[13] = hsb_to_rgb(hsb);
+    pixels[14] = hsb_to_rgb(hsb);
+    pixels[15] = hsb_to_rgb(hsb);
 }
 
 static void zmk_rgb_underglow_effect_breathe() {
