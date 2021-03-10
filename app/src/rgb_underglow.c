@@ -30,9 +30,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 enum rgb_underglow_effect {
     UNDERGLOW_EFFECT_SOLID,
-    UNDERGLOW_EFFECT_BREATHE,
-    UNDERGLOW_EFFECT_SPECTRUM,
-    UNDERGLOW_EFFECT_SWIRL,
+    //UNDERGLOW_EFFECT_BREATHE,
+    //UNDERGLOW_EFFECT_SPECTRUM,
+    //UNDERGLOW_EFFECT_SWIRL,
     UNDERGLOW_EFFECT_NUMBER // Used to track number of underglow effects
 };
 
@@ -111,9 +111,9 @@ static void zmk_rgb_underglow_effect_solid() {
     */
 
     struct zmk_led_hsb hsb = state.color;
-    hsb.h = 220; // azure
+    hsb.h = 230; // azure
     hsb.s = 100;
-    hsb.b = 100;
+    hsb.b = 25;
     pixels[10] = hsb_to_rgb(hsb);
     pixels[16] = hsb_to_rgb(hsb);
     pixels[17] = hsb_to_rgb(hsb);
@@ -127,7 +127,7 @@ static void zmk_rgb_underglow_effect_solid() {
     pixels[25] = hsb_to_rgb(hsb);
     pixels[26] = hsb_to_rgb(hsb);
 
-    hsb.h = 320; // rose
+    hsb.h = 345; // rose
 
     pixels[0] = hsb_to_rgb(hsb);
     pixels[1] = hsb_to_rgb(hsb);
@@ -186,6 +186,7 @@ static void zmk_rgb_underglow_effect_swirl() {
 }
 
 static void zmk_rgb_underglow_tick(struct k_work *work) {
+	/*
     switch (state.current_effect) {
     case UNDERGLOW_EFFECT_SOLID:
         zmk_rgb_underglow_effect_solid();
@@ -200,7 +201,9 @@ static void zmk_rgb_underglow_tick(struct k_work *work) {
         zmk_rgb_underglow_effect_swirl();
         break;
     }
+	*/
 
+	zmk_rgb_underglow_effect_solid();
     led_strip_update_rgb(led_strip, pixels, STRIP_NUM_PIXELS);
 }
 
