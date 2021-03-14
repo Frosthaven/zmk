@@ -128,13 +128,6 @@ static void zmk_rgb_underglow_effect_solid() {
     pixels[26] = hsb_to_rgb(hsb);
 
     hsb.h = 345; // rose
-
-    pixels[0] = hsb_to_rgb(hsb);
-    pixels[1] = hsb_to_rgb(hsb);
-    pixels[2] = hsb_to_rgb(hsb);
-    pixels[3] = hsb_to_rgb(hsb);
-    pixels[4] = hsb_to_rgb(hsb);
-    pixels[5] = hsb_to_rgb(hsb);
     pixels[6] = hsb_to_rgb(hsb);
     pixels[7] = hsb_to_rgb(hsb);
     pixels[8] = hsb_to_rgb(hsb);
@@ -144,8 +137,17 @@ static void zmk_rgb_underglow_effect_solid() {
     pixels[13] = hsb_to_rgb(hsb);
     pixels[14] = hsb_to_rgb(hsb);
     pixels[15] = hsb_to_rgb(hsb);
+
+    hsb.b = 0; // off
+    pixels[0] = hsb_to_rgb(hsb);
+    pixels[1] = hsb_to_rgb(hsb);
+    pixels[2] = hsb_to_rgb(hsb);
+    pixels[3] = hsb_to_rgb(hsb);
+    pixels[4] = hsb_to_rgb(hsb);
+    pixels[5] = hsb_to_rgb(hsb);
 }
 
+/*
 static void zmk_rgb_underglow_effect_breathe() {
     for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
         struct zmk_led_hsb hsb = state.color;
@@ -184,6 +186,7 @@ static void zmk_rgb_underglow_effect_swirl() {
     state.animation_step += state.animation_speed * 2;
     state.animation_step = state.animation_step % HUE_MAX;
 }
+*/
 
 static void zmk_rgb_underglow_tick(struct k_work *work) {
 	/*
