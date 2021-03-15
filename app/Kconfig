@@ -246,6 +246,50 @@ config ZMK_RGB_UNDERGLOW_ON_START
 	bool "RGB underglow starts on by default"
 	default y
 
+config ZMK_RGB_LAYER_LIGHTING
+	bool "Enable per-layer per-key lighting"
+	default n
+
+config ZMK_RGB_LAYER_HSB_0
+	string "Layer 0 hsb configuration"
+	default "0"
+
+config ZMK_RGB_LAYER_HSB_1
+	string "Layer 1 hsb configuration"
+	default "0"
+
+config ZMK_RGB_LAYER_HSB_2
+	string "Layer 2 hsb configuration"
+	default "0"
+
+config ZMK_RGB_LAYER_HSB_3
+	string "Layer 3 hsb configuration"
+	default "0"
+
+config ZMK_RGB_LAYER_HSB_4
+	string "Layer 4 hsb configuration"
+	default "0"
+
+config ZMK_RGB_LAYER_HSB_5
+	string "Layer 5 hsb configuration"
+	default "0"
+
+config ZMK_RGB_LAYER_HSB_6
+	string "Layer 6 hsb configuration"
+	default "0"
+
+config ZMK_RGB_LAYER_HSB_7
+	string "Layer 7 hsb configuration"
+	default "0"
+
+config ZMK_RGB_LAYER_HSB_8
+	string "Layer 8 hsb configuration"
+	default "0"
+
+config ZMK_RGB_LAYER_HSB_9
+	string "Layer 9 hsb configuration"
+	default "0"
+
 #ZMK_RGB_UNDERGLOW
 endif
 

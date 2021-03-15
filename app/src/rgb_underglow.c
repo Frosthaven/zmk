@@ -19,6 +19,11 @@
 
 #include <zmk/rgb_underglow.h>
 
+#include <zmk/events/layer_state_changed.h>
+#include <zmk/event_manager.h>
+#include <zmk/keymap.h>
+#include <zmk/endpoints.h>
+
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #define STRIP_LABEL DT_LABEL(DT_CHOSEN(zmk_underglow))
@@ -29,7 +34,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #define BRT_MAX 100
 
 enum rgb_underglow_effect {
-    UNDERGLOW_EFFECT_SOLID,
+    UNDERGLOW_EFFECT_CUSTOM,
+    UNDERGLOW_EFFECT_LAYER,
+    //UNDERGLOW_EFFECT_SOLID,
     //UNDERGLOW_EFFECT_BREATHE,
     //UNDERGLOW_EFFECT_SPECTRUM,
     //UNDERGLOW_EFFECT_SWIRL,
@@ -41,6 +48,7 @@ struct rgb_underglow_state {
     uint8_t animation_speed;
     uint8_t current_effect;
     uint16_t animation_step;
+    uint16_t active_layer;
     bool on;
 };
 
@@ -103,17 +111,10 @@ static struct led_rgb hsb_to_rgb(struct zmk_led_hsb hsb) {
     return rgb;
 }
 
-static void zmk_rgb_underglow_effect_solid() {
-    /* PER KEY HACKING TIME
-    for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
-        pixels[i] = hsb_to_rgb(state.color);
-    }
-    */
-
+static void zmk_rgb_underglow_effect_custom() {
     struct zmk_led_hsb hsb = state.color;
     hsb.h = 230; // azure
-    hsb.s = 100;
-    hsb.b = 25;
+    //outer cluster
     pixels[10] = hsb_to_rgb(hsb);
     pixels[16] = hsb_to_rgb(hsb);
     pixels[17] = hsb_to_rgb(hsb);
@@ -128,6 +129,16 @@ static void zmk_rgb_underglow_effect_solid() {
     pixels[26] = hsb_to_rgb(hsb);
 
     hsb.h = 345; // rose
+
+    //underglow
+    pixels[0] = hsb_to_rgb(hsb);
+    pixels[1] = hsb_to_rgb(hsb);
+    pixels[2] = hsb_to_rgb(hsb);
+    pixels[3] = hsb_to_rgb(hsb);
+    pixels[4] = hsb_to_rgb(hsb);
+    pixels[5] = hsb_to_rgb(hsb);
+
+    //inner cluster
     pixels[6] = hsb_to_rgb(hsb);
     pixels[7] = hsb_to_rgb(hsb);
     pixels[8] = hsb_to_rgb(hsb);
@@ -137,17 +148,52 @@ static void zmk_rgb_underglow_effect_solid() {
     pixels[13] = hsb_to_rgb(hsb);
     pixels[14] = hsb_to_rgb(hsb);
     pixels[15] = hsb_to_rgb(hsb);
-
-    hsb.b = 0; // off
-    pixels[0] = hsb_to_rgb(hsb);
-    pixels[1] = hsb_to_rgb(hsb);
-    pixels[2] = hsb_to_rgb(hsb);
-    pixels[3] = hsb_to_rgb(hsb);
-    pixels[4] = hsb_to_rgb(hsb);
-    pixels[5] = hsb_to_rgb(hsb);
 }
 
-/*
+static void zmk_rgb_underglow_effect_layer() {
+    if (state.current_effect == UNDERGLOW_EFFECT_LAYER) {
+        struct zmk_led_hsb hsb = state.color;
+        hsb.h = 1;
+        switch(state.active_layer) {
+            case 0:
+                hsb.h = 220;
+                break;
+            case 1:
+                hsb.h = 30;
+                break;
+            case 2:
+                hsb.h = 60;
+                break;
+            case 3:
+                hsb.h = 90;
+                break;
+            case 4:
+                hsb.h = 120;
+                break;
+            case 5:
+                hsb.h = 150;
+                break;
+            case 6:
+                hsb.h = 180;
+                break;
+            case 7:
+                hsb.h = 1;
+                break;
+        }
+
+
+        for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
+            pixels[i] = hsb_to_rgb(hsb);
+        }
+    }
+}
+
+static void zmk_rgb_underglow_effect_solid() {
+    for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
+        pixels[i] = hsb_to_rgb(state.color);
+    }
+}
+
 static void zmk_rgb_underglow_effect_breathe() {
     for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
         struct zmk_led_hsb hsb = state.color;
@@ -186,27 +232,29 @@ static void zmk_rgb_underglow_effect_swirl() {
     state.animation_step += state.animation_speed * 2;
     state.animation_step = state.animation_step % HUE_MAX;
 }
-*/
 
 static void zmk_rgb_underglow_tick(struct k_work *work) {
-	/*
     switch (state.current_effect) {
-    case UNDERGLOW_EFFECT_SOLID:
-        zmk_rgb_underglow_effect_solid();
+    case UNDERGLOW_EFFECT_CUSTOM:
+        zmk_rgb_underglow_effect_custom();
         break;
-    case UNDERGLOW_EFFECT_BREATHE:
-        zmk_rgb_underglow_effect_breathe();
+    case UNDERGLOW_EFFECT_LAYER:
+        zmk_rgb_underglow_effect_layer(); // @todo need keymap.h for layer state but that breaks things from locality pr by forcing it in cmakelists.txt
         break;
-    case UNDERGLOW_EFFECT_SPECTRUM:
-        zmk_rgb_underglow_effect_spectrum();
-        break;
-    case UNDERGLOW_EFFECT_SWIRL:
-        zmk_rgb_underglow_effect_swirl();
-        break;
+    //case UNDERGLOW_EFFECT_SOLID:
+    //    zmk_rgb_underglow_effect_solid();
+    //    break;
+    //case UNDERGLOW_EFFECT_BREATHE:
+    //    zmk_rgb_underglow_effect_breathe();
+    //    break;
+    //case UNDERGLOW_EFFECT_SPECTRUM:
+    //    zmk_rgb_underglow_effect_spectrum();
+    //    break;
+    //case UNDERGLOW_EFFECT_SWIRL:
+    //    zmk_rgb_underglow_effect_swirl();
+    //    break;
     }
-	*/
 
-	zmk_rgb_underglow_effect_solid();
     led_strip_update_rgb(led_strip, pixels, STRIP_NUM_PIXELS);
 }
 
@@ -277,6 +325,7 @@ static int zmk_rgb_underglow_init(const struct device *_arg) {
         animation_speed : CONFIG_ZMK_RGB_UNDERGLOW_SPD_START,
         current_effect : CONFIG_ZMK_RGB_UNDERGLOW_EFF_START,
         animation_step : 0,
+        active_layer: 0,
         on : IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW_ON_START)
     };
 
@@ -467,5 +516,208 @@ int zmk_rgb_underglow_change_spd(int direction) {
 
     return zmk_rgb_underglow_save_state();
 }
+
+int tokenize(const char **input, const char *delimmter, char buf[], int buf_size) {
+    if(**input == 0)
+        return 0;
+
+    int i = strcspn(*input, delimmter);
+    strncpy(buf, *input, i > buf_size ? buf_size : i);
+    buf[(i > buf_size ? buf_size - 1: i)] = 0;
+
+    *input += i + (i != strlen(*input));
+
+    return 1;
+}
+
+//void set_layer_index() {
+    //zmk_rgb_underglow_effect_layer(zmk_keymap_highest_layer_active());
+    //led_strip_update_rgb(led_strip, pixels, STRIP_NUM_PIXELS);
+
+
+    /*
+    switch (active_layer_index) {
+        case 1:
+            selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_1;
+            break;
+        case 2:
+            selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_2;
+            break;
+        case 3:
+            selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_3;
+            break;
+        case 4:
+            selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_4;
+            break;
+        case 5:
+            selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_5;
+            hsb.h = 120;
+            for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
+                pixels[i] = hsb_to_rgb(hsb);
+            }
+            break;
+        case 6:
+            selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_6;
+            break;
+        case 7:
+            selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_7;
+            hsb.h = 10;
+            for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
+                pixels[i] = hsb_to_rgb(hsb);
+            }
+            break;
+        case 8:
+            selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_8;
+            break;
+        case 9:
+            selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_9;
+            break;
+        default:
+            selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_0;
+            hsb.h = 60;
+            for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
+                pixels[i] = hsb_to_rgb(hsb);
+            }
+            break;
+    }
+
+    led_strip_update_rgb(led_strip, pixels, STRIP_NUM_PIXELS);
+    */
+//}
+//void set_layer_color() {
+    //int active_layer_index = zmk_keymap_highest_layer_active();
+/*
+    LOG_DBG("Layer changed to %i", active_layer_index);
+
+    const char *layer_label = zmk_keymap_layer_label(active_layer_index);
+    if (layer_label == NULL) {
+        char text[6] = {};
+
+        sprintf(text, LV_SYMBOL_KEYBOARD "%i", active_layer_index);
+
+        lv_label_set_text(label, text);
+    } else {
+        char text[12] = {};
+
+        snprintf(text, 12, LV_SYMBOL_KEYBOARD "%s", layer_label);
+
+        lv_label_set_text(label, text);
+    }
+*/
+//}
+
+//int rgb_layer_status_listener(const zmk_event_t *eh) {
+    //uint8_t active_layer = zmk_keymap_highest_layer_active();
+//    return 0;
+    //set_layer_index();
+
+/*  
+    if (state.current_effect == UNDERGLOW_EFFECT_LAYER) {
+        const char * selected_layer;
+        struct zmk_led_hsb hsb = state.color;
+        hsb.h = 60;
+        hsb.s = 100;
+        hsb.b = 35;
+        switch (5) {
+            case 1:
+                selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_1;
+                break;
+            case 2:
+                selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_2;
+                break;
+            case 3:
+                selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_3;
+                break;
+            case 4:
+                selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_4;
+                break;
+            case 5:
+                selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_5;
+                hsb.h = 120;
+                for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
+                    pixels[i] = hsb_to_rgb(hsb);
+                }
+                break;
+            case 6:
+                selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_6;
+                break;
+            case 7:
+                selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_7;
+                hsb.h = 10;
+                for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
+                    pixels[i] = hsb_to_rgb(hsb);
+                }
+                break;
+            case 8:
+                selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_8;
+                break;
+            case 9:
+                selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_9;
+                break;
+            default:
+                selected_layer = CONFIG_ZMK_RGB_LAYER_HSB_0;
+                hsb.h = 60;
+                for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
+                    pixels[i] = hsb_to_rgb(hsb);
+                }
+                break;
+        }
+
+        char buf[STRIP_NUM_PIXELS];
+
+        int led_step = 0;
+        while (tokenize(&selected_layer, ",", buf, sizeof(buf)))
+        {
+            //each led sequence stored in %s as hhh.sss.bbb
+            const char * hsb_str = "%s";
+            char bufsub[2];
+            struct zmk_led_hsb hsb = state.color;
+
+            int stat_step = 0;
+            while(tokenize(&hsb_str, ".", bufsub, sizeof(bufsub)))
+            {
+                if (stat_step == 0) {
+                    hsb.h = (int) strtol("%s", (char **)NULL, 10);
+                } else if (stat_step == 1) {
+                    hsb.s = (int) strtol("%s", (char **)NULL, 10);
+                } else if (stat_step == 2) {
+                    hsb.b = (int) strtol("%s", (char **)NULL, 10);
+                }
+                stat_step++;
+            }
+
+            hsb.h = 60;
+            hsb.s = 100;
+            hsb.b = 35;
+            pixels[led_step] = hsb_to_rgb(hsb);
+            led_step++;
+        }
+        led_strip_update_rgb(led_strip, pixels, STRIP_NUM_PIXELS);
+    }
+*/
+//}
+
+//ZMK_LISTENER(rgb_layer_status, rgb_layer_status_listener);
+//ZMK_SUBSCRIPTION(rgb_layer_status, zmk_layer_state_changed);
+
+#if ((!CONFIG_ZMK_SPLIT) || CONFIG_ZMK_SPLIT_BLE_ROLE_CENTRAL)
+int rgb_layer_change_listener(const zmk_event_t *eh) {
+    if (!state.on) {
+        return 0;
+    }
+
+    state.active_layer = zmk_keymap_highest_layer_active();
+    // @todo sync state.active_layer to peripheral
+
+    /* access specific event data like this:
+    const struct zmk_layer_state_changed *layer_ev;
+    layer_ev = as_zmk_layer_state_changed(eh);
+    active_layer = layer_ev->layer;
+    */
+    return 0;
+}
+ZMK_LISTENER(rgblayer, rgb_layer_change_listener)
+ZMK_SUBSCRIPTION(rgblayer, zmk_layer_state_changed);
+#endif
 
 SYS_INIT(zmk_rgb_underglow_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
