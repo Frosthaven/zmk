@@ -114,6 +114,7 @@ static struct led_rgb hsb_to_rgb(struct zmk_led_hsb hsb) {
 static void zmk_rgb_underglow_effect_custom() {
     struct zmk_led_hsb hsb = state.color;
     hsb.h = 230; // azure
+    hsb.s = 100;    
     //outer cluster
     pixels[10] = hsb_to_rgb(hsb);
     pixels[16] = hsb_to_rgb(hsb);
