@@ -36,10 +36,10 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 enum rgb_underglow_effect {
     UNDERGLOW_EFFECT_CUSTOM,
     UNDERGLOW_EFFECT_LAYER,
-    //UNDERGLOW_EFFECT_SOLID,
-    //UNDERGLOW_EFFECT_BREATHE,
-    //UNDERGLOW_EFFECT_SPECTRUM,
-    //UNDERGLOW_EFFECT_SWIRL,
+    UNDERGLOW_EFFECT_SOLID,
+    UNDERGLOW_EFFECT_BREATHE,
+    UNDERGLOW_EFFECT_SPECTRUM,
+    UNDERGLOW_EFFECT_SWIRL,
     UNDERGLOW_EFFECT_NUMBER // Used to track number of underglow effects
 };
 
@@ -241,18 +241,18 @@ static void zmk_rgb_underglow_tick(struct k_work *work) {
     case UNDERGLOW_EFFECT_LAYER:
         zmk_rgb_underglow_effect_layer(); // @todo need keymap.h for layer state but that breaks things from locality pr by forcing it in cmakelists.txt
         break;
-    //case UNDERGLOW_EFFECT_SOLID:
-    //    zmk_rgb_underglow_effect_solid();
-    //    break;
-    //case UNDERGLOW_EFFECT_BREATHE:
-    //    zmk_rgb_underglow_effect_breathe();
-    //    break;
-    //case UNDERGLOW_EFFECT_SPECTRUM:
-    //    zmk_rgb_underglow_effect_spectrum();
-    //    break;
-    //case UNDERGLOW_EFFECT_SWIRL:
-    //    zmk_rgb_underglow_effect_swirl();
-    //    break;
+    case UNDERGLOW_EFFECT_SOLID:
+        zmk_rgb_underglow_effect_solid();
+        break;
+    case UNDERGLOW_EFFECT_BREATHE:
+        zmk_rgb_underglow_effect_breathe();
+        break;
+    case UNDERGLOW_EFFECT_SPECTRUM:
+        zmk_rgb_underglow_effect_spectrum();
+        break;
+    case UNDERGLOW_EFFECT_SWIRL:
+        zmk_rgb_underglow_effect_swirl();
+        break;
     }
 
     led_strip_update_rgb(led_strip, pixels, STRIP_NUM_PIXELS);
@@ -707,7 +707,10 @@ int rgb_layer_change_listener(const zmk_event_t *eh) {
     }
 
     state.active_layer = zmk_keymap_highest_layer_active();
-    // @todo sync state.active_layer to peripheral
+
+    #if CONFIG_ZMK_SPLIT
+        // @todo sync state.active_layer to peripheral
+    #endif
 
     /* access specific event data like this:
     const struct zmk_layer_state_changed *layer_ev;
