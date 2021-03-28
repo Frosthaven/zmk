@@ -35,7 +35,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 enum rgb_underglow_effect {
     UNDERGLOW_EFFECT_CUSTOM,
-    UNDERGLOW_EFFECT_LAYER,
+    //UNDERGLOW_EFFECT_LAYER,
     UNDERGLOW_EFFECT_SOLID,
     UNDERGLOW_EFFECT_BREATHE,
     UNDERGLOW_EFFECT_SPECTRUM,
@@ -151,6 +151,7 @@ static void zmk_rgb_underglow_effect_custom() {
     pixels[15] = hsb_to_rgb(hsb);
 }
 
+/*
 static void zmk_rgb_underglow_effect_layer() {
     if (state.current_effect == UNDERGLOW_EFFECT_LAYER) {
         struct zmk_led_hsb hsb = state.color;
@@ -188,6 +189,7 @@ static void zmk_rgb_underglow_effect_layer() {
         }
     }
 }
+*/
 
 static void zmk_rgb_underglow_effect_solid() {
     for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
@@ -239,9 +241,11 @@ static void zmk_rgb_underglow_tick(struct k_work *work) {
     case UNDERGLOW_EFFECT_CUSTOM:
         zmk_rgb_underglow_effect_custom();
         break;
+    /*
     case UNDERGLOW_EFFECT_LAYER:
         zmk_rgb_underglow_effect_layer(); // @todo need keymap.h for layer state but that breaks things from locality pr by forcing it in cmakelists.txt
         break;
+    */
     case UNDERGLOW_EFFECT_SOLID:
         zmk_rgb_underglow_effect_solid();
         break;
