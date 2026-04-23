@@ -22,9 +22,95 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/activity.h>
 #include <zmk/workqueue.h>
 
+#if IS_ENABLED(CONFIG_ZMK_SPLIT) && !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL) &&                  \
+    IS_ENABLED(CONFIG_BT_BAS) && IS_ENABLED(CONFIG_NRFX_POWER)
+#define ZMK_BATTERY_ENCODE_PERIPHERAL_CHARGING 1
+#include <hal/nrf_power.h>
+#include <nrfx_power.h>
+#endif
+
+#if IS_ENABLED(CONFIG_ZMK_USB)
+#include <zmk/usb.h>
+#include <zmk/events/usb_conn_state_changed.h>
+#endif
+
+// On USB drop, schedule a single delayed re-poll so the cell has had a moment
+// to start relaxing from charging voltage before we sample. 5s is short enough
+// that the user barely notices the "stale" UI placeholder, but the reading
+// won't be perfectly settled (5-10% inflation possible). The next regular 60s
+// poll refines it further.
+#if defined(ZMK_BATTERY_ENCODE_PERIPHERAL_CHARGING) || IS_ENABLED(CONFIG_ZMK_USB)
+#define ZMK_BATTERY_RELAX_AFTER_UNPLUG 1
+static void battery_relax_work_handler(struct k_work *work);
+K_WORK_DELAYABLE_DEFINE(battery_relax_work, battery_relax_work_handler);
+#endif
+
 static uint8_t last_state_of_charge = 0;
 
 uint8_t zmk_battery_state_of_charge(void) { return last_state_of_charge; }
+
+#if IS_ENABLED(CONFIG_BT_BAS)
+// Push last_state_of_charge to the BAS characteristic. On peripheral builds,
+// bit 7 of the transmitted byte carries the USB-powered flag so the central
+// can decode charging state. Relies on the forked Zephyr BAS, which accepts
+// any uint8_t value (upstream rejects > 100).
+static int zmk_battery_publish_bas(void) {
+    uint8_t bas_level = last_state_of_charge;
+#if defined(ZMK_BATTERY_ENCODE_PERIPHERAL_CHARGING)
+    if (nrf_power_usbregstatus_vbusdet_get(NRF_POWER)) {
+        bas_level |= 0x80;
+    }
+#endif
+    if (bt_bas_get_battery_level() == bas_level) {
+        return 0;
+    }
+    LOG_DBG("Setting BAS GATT battery level to %d.", bas_level);
+    int rc = bt_bas_set_battery_level(bas_level);
+    if (rc != 0) {
+        LOG_WRN("Failed to set BAS GATT battery level (err %d)", rc);
+    }
+    return rc;
+}
+#endif
+
+#if defined(ZMK_BATTERY_ENCODE_PERIPHERAL_CHARGING)
+// Forward BAS publish + local widget refresh to the low-prio workqueue; called
+// from the POWER ISR so the work must be deferred out of interrupt context.
+static void peripheral_usb_publish_work_handler(struct k_work *work) {
+    (void)zmk_battery_publish_bas();
+    // Raise a battery-state-changed event so the peripheral's own display
+    // widget (which subscribes to this event) re-reads VBUS and repaints.
+    (void)raise_zmk_battery_state_changed(
+        (struct zmk_battery_state_changed){.state_of_charge = last_state_of_charge});
+}
+K_WORK_DEFINE(peripheral_usb_publish_work, peripheral_usb_publish_work_handler);
+
+static void peripheral_usb_evt_handler(nrfx_power_usb_evt_t event) {
+    if (event == NRFX_POWER_USB_EVT_REMOVED) {
+        k_work_schedule_for_queue(zmk_workqueue_lowprio_work_q(), &battery_relax_work,
+                                  K_SECONDS(5));
+    } else if (event == NRFX_POWER_USB_EVT_DETECTED) {
+        k_work_cancel_delayable(&battery_relax_work);
+    }
+    k_work_submit_to_queue(zmk_workqueue_lowprio_work_q(), &peripheral_usb_publish_work);
+}
+
+static int peripheral_usb_evt_init(void) {
+    nrfx_power_config_t pwr_config = {0};
+    nrfx_err_t rc = nrfx_power_init(&pwr_config);
+    if (rc != NRFX_SUCCESS && rc != NRFX_ERROR_ALREADY_INITIALIZED) {
+        LOG_WRN("nrfx_power_init failed: 0x%x", rc);
+        return -EIO;
+    }
+    nrfx_power_usbevt_config_t usb_config = {
+        .handler = peripheral_usb_evt_handler,
+    };
+    nrfx_power_usbevt_init(&usb_config);
+    nrfx_power_usbevt_enable();
+    return 0;
+}
+SYS_INIT(peripheral_usb_evt_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+#endif
 
 #if DT_HAS_CHOSEN(zmk_battery)
 static const struct device *const battery = DEVICE_DT_GET(DT_CHOSEN(zmk_battery));
@@ -104,15 +190,9 @@ static int zmk_battery_update(const struct device *battery) {
     }
 
 #if IS_ENABLED(CONFIG_BT_BAS)
-    if (bt_bas_get_battery_level() != last_state_of_charge) {
-        LOG_DBG("Setting BAS GATT battery level to %d.", last_state_of_charge);
-
-        rc = bt_bas_set_battery_level(last_state_of_charge);
-
-        if (rc != 0) {
-            LOG_WRN("Failed to set BAS GATT battery level (err %d)", rc);
-            return rc;
-        }
+    rc = zmk_battery_publish_bas();
+    if (rc != 0) {
+        return rc;
     }
 #endif
 
@@ -128,6 +208,30 @@ static void zmk_battery_work(struct k_work *work) {
 }
 
 K_WORK_DEFINE(battery_work, zmk_battery_work);
+
+#if defined(ZMK_BATTERY_RELAX_AFTER_UNPLUG)
+static void battery_relax_work_handler(struct k_work *work) {
+    // Read the (now slightly relaxed) ADC value. May or may not change
+    // last_state_of_charge.
+    (void)zmk_battery_update(battery);
+
+#if defined(ZMK_BATTERY_ENCODE_PERIPHERAL_CHARGING)
+    // Force-notify BAS so the central sees a peripheral-battery event even
+    // when the level didn't actually change. Bypasses the dedup in
+    // zmk_battery_publish_bas (which would no-op an unchanged value).
+    uint8_t bas_level = last_state_of_charge;
+    if (nrf_power_usbregstatus_vbusdet_get(NRF_POWER)) {
+        bas_level |= 0x80;
+    }
+    (void)bt_bas_set_battery_level(bas_level);
+#endif
+
+    // Always raise locally so the widget can clear its "stale" placeholder
+    // even when the level happens to be unchanged.
+    (void)raise_zmk_battery_state_changed(
+        (struct zmk_battery_state_changed){.state_of_charge = last_state_of_charge});
+}
+#endif
 
 static void zmk_battery_timer(struct k_timer *timer) {
     k_work_submit_to_queue(zmk_workqueue_lowprio_work_q(), &battery_work);
@@ -176,11 +280,25 @@ static int battery_event_listener(const zmk_event_t *eh) {
             break;
         }
     }
+#if IS_ENABLED(CONFIG_ZMK_USB)
+    if (as_zmk_usb_conn_state_changed(eh)) {
+        if (zmk_usb_is_powered()) {
+            k_work_cancel_delayable(&battery_relax_work);
+        } else {
+            k_work_schedule_for_queue(zmk_workqueue_lowprio_work_q(), &battery_relax_work,
+                                      K_SECONDS(5));
+        }
+        return 0;
+    }
+#endif
     return -ENOTSUP;
 }
 
 ZMK_LISTENER(battery, battery_event_listener);
 
 ZMK_SUBSCRIPTION(battery, zmk_activity_state_changed);
+#if IS_ENABLED(CONFIG_ZMK_USB)
+ZMK_SUBSCRIPTION(battery, zmk_usb_conn_state_changed);
+#endif
 
 SYS_INIT(zmk_battery_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);

@@ -93,6 +93,15 @@ target_sources_ifdef(CONFIG_ZMK_BACKLIGHT app PRIVATE src/behaviors/behavior_bac
 target_sources_ifdef(CONFIG_ZMK_BATTERY_REPORTING app PRIVATE src/events/battery_state_changed.c)
 target_sources_ifdef(CONFIG_ZMK_BATTERY_REPORTING app PRIVATE src/battery.c)
 
+target_sources_ifdef(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR app PRIVATE
+    src/events/central_battery_state_changed.c)
+# The sender listener + helper only compile on the central (it calls
+# zmk_split_central_update_central_battery, which is defined in
+# split/central.c and is therefore central-only).
+if (CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR AND CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    target_sources(app PRIVATE src/central_battery_sync.c)
+endif()
+
 target_sources_ifdef(CONFIG_ZMK_HID_INDICATORS app PRIVATE src/events/hid_indicators_changed.c)
 
 target_sources_ifdef(CONFIG_ZMK_SPLIT app PRIVATE src/events/split_peripheral_status_changed.c)

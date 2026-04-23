@@ -32,6 +32,10 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/events/hid_indicators_changed.h>
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
 
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
+#include <zmk/events/central_battery_state_changed.h>
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
+
 #include <zmk/events/sensor_event.h>
 #include <zmk/sensors.h>
 
@@ -102,6 +106,35 @@ static ssize_t split_svc_update_indicators(struct bt_conn *conn, const struct bt
 }
 
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
+
+static uint8_t central_battery_state = 0;
+
+static void split_svc_central_battery_callback(struct k_work *work) {
+    const uint8_t state = central_battery_state;
+    LOG_DBG("Raising central battery state changed event: 0x%02x", state);
+    raise_zmk_central_battery_state_changed((struct zmk_central_battery_state_changed){
+        .state_of_charge = state & 0x7F,
+        .usb_powered     = (state & 0x80) != 0,
+    });
+}
+
+static K_WORK_DEFINE(split_svc_central_battery_work, split_svc_central_battery_callback);
+
+static ssize_t split_svc_update_central_battery(struct bt_conn *conn,
+                                                const struct bt_gatt_attr *attr,
+                                                const void *buf, uint16_t len, uint16_t offset,
+                                                uint8_t flags) {
+    if (offset + len > sizeof(central_battery_state)) {
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    }
+    memcpy((uint8_t *)&central_battery_state + offset, buf, len);
+    k_work_submit(&split_svc_central_battery_work);
+    return len;
+}
+
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
 
 static uint8_t selected_phys_layout = 0;
 
@@ -201,6 +234,11 @@ BT_GATT_SERVICE_DEFINE(
                                BT_GATT_CHRC_WRITE_WITHOUT_RESP, BT_GATT_PERM_WRITE_ENCRYPT, NULL,
                                split_svc_update_indicators, NULL),
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
+        BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_CENTRAL_BATTERY_STATE_UUID),
+                               BT_GATT_CHRC_WRITE_WITHOUT_RESP, BT_GATT_PERM_WRITE_ENCRYPT, NULL,
+                               split_svc_update_central_battery, NULL),
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
     BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_SELECT_PHYS_LAYOUT_UUID),
                            BT_GATT_CHRC_WRITE | BT_GATT_CHRC_READ,
                            BT_GATT_PERM_WRITE_ENCRYPT | BT_GATT_PERM_READ_ENCRYPT,

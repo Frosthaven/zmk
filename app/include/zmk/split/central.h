@@ -46,3 +46,16 @@ int zmk_split_central_update_hid_indicator(zmk_hid_indicators_t indicators);
 int zmk_split_central_get_peripheral_battery_level(uint8_t source, uint8_t *level);
 
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
+
+/* Encoded: bits 0..6 = level, bit 7 = USB powered. */
+int zmk_split_central_update_central_battery(uint8_t state);
+
+/* Invalidate the outgoing-state cache and re-send. Call this when a
+ * peripheral's central-battery handle has just been discovered so the
+ * peripheral doesn't stay stuck on "X" waiting for the next battery
+ * event (which can be minutes away on a steady charge). */
+void zmk_split_central_resend_central_battery_state(void);
+
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)

@@ -76,6 +76,17 @@ config ZMK_SPLIT_BLE_PREF_TIMEOUT
 
 endif # ZMK_SPLIT_ROLE_CENTRAL
 
+# Visible on both central and peripheral roles: central needs the sender +
+# listener, peripheral needs the GATT characteristic + write handler +
+# event raise.
+config ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR
+    bool "Mirror central battery state to peripherals"
+    help
+      Adds a split-service characteristic the central writes to with its
+      own battery level + USB state, so the peripheral half can display
+      both cells. Encoding: bits 0..6 = state-of-charge, bit 7 = USB
+      powered (same scheme the peripheral uses going the other way).
+
 if !ZMK_SPLIT_ROLE_CENTRAL
 
 config ZMK_SPLIT_BLE_PERIPHERAL_STACK_SIZE
