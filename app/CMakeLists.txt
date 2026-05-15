@@ -102,6 +102,12 @@ if (CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR AND CONFIG_ZMK_SPLIT_ROLE_CENTRA
     target_sources(app PRIVATE src/central_battery_sync.c)
 endif()
 
+target_sources_ifdef(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC app PRIVATE
+    src/events/split_remote_smart_idle_state_changed.c)
+
+target_sources_ifdef(CONFIG_ZMK_RGB_UNDERGLOW_STATE_EVENT app PRIVATE
+    src/events/rgb_underglow_state_changed.c)
+
 target_sources_ifdef(CONFIG_ZMK_HID_INDICATORS app PRIVATE src/events/hid_indicators_changed.c)
 
 target_sources_ifdef(CONFIG_ZMK_SPLIT app PRIVATE src/events/split_peripheral_status_changed.c)

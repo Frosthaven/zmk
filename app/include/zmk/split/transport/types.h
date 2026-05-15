@@ -67,6 +67,7 @@ enum zmk_split_transport_central_command_type {
     ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_PHYSICAL_LAYOUT,
     ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_HID_INDICATORS,
     ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_CENTRAL_BATTERY_STATE,
+    ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_SMART_IDLE_STATE,
 } __packed;
 
 struct zmk_split_transport_central_command {
@@ -92,5 +93,9 @@ struct zmk_split_transport_central_command {
         struct {
             uint8_t state;
         } set_central_battery_state;
+
+        struct {
+            uint8_t state;
+        } set_smart_idle_state;
     } data;
 } __packed;

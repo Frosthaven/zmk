@@ -335,6 +335,16 @@ config ZMK_RGB_UNDERGLOW_AUTO_OFF_USB
     bool "Turn off RGB underglow when USB is disconnected"
     depends on USB_DEVICE_STACK
 
+config ZMK_RGB_UNDERGLOW_STATE_EVENT
+    bool "Raise zmk_rgb_underglow_state_changed event on HSB / on / off changes"
+    help
+      Emits a ZMK event whenever the RGB underglow runtime state changes
+      via zmk_rgb_underglow_set_hsb() or the on/off toggles. External
+      modules can subscribe to react to brightness or on/off transitions
+      (for example, to continuously enforce a battery brightness cap).
+      Default off so that adding the event does not affect builds that
+      don't subscribe to it.
+
 endif # ZMK_RGB_UNDERGLOW
 
 menuconfig ZMK_BACKLIGHT

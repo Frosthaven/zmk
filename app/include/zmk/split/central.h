@@ -59,3 +59,15 @@ int zmk_split_central_update_central_battery(uint8_t state);
 void zmk_split_central_resend_central_battery_state(void);
 
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
+
+/* Central-side: write the central's own smart-idle state to all
+ * connected peripherals. State byte encoding:
+ *   bit 0 = ACTIVE flag (1 = central is currently active)
+ *   bit 1 = BATTERY_BELOW_CUTOFF flag
+ * Peripherals raise zmk_split_remote_smart_idle_state_changed when the
+ * write arrives. */
+int zmk_split_central_set_central_smart_idle_state(uint8_t state);
+
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)

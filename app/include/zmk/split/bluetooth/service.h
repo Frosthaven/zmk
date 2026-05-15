@@ -37,3 +37,11 @@ struct zmk_split_input_event_payload {
     uint32_t value;
     uint8_t sync;
 } __packed;
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
+/* Peripheral-side: notify the central of this half's smart-idle state.
+ * State byte encoding: bit 0 = ACTIVE, bit 1 = BATTERY_BELOW_CUTOFF.
+ * Only callable from peripheral builds; the central uses
+ * zmk_split_central_set_central_smart_idle_state() instead. */
+int zmk_split_bt_service_notify_smart_idle_state(uint8_t state);
+#endif

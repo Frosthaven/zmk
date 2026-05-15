@@ -87,6 +87,19 @@ config ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR
       both cells. Encoding: bits 0..6 = state-of-charge, bit 7 = USB
       powered (same scheme the peripheral uses going the other way).
 
+config ZMK_SPLIT_BLE_SMART_IDLE_SYNC
+    bool "Share smart-idle state (activity + battery cutoff) across halves"
+    help
+      Adds a bidirectional split-service characteristic that lets each
+      half tell the other its activity state and battery-cutoff state.
+      The characteristic supports both WRITE_WITHOUT_RESP (central writes
+      its state to peripheral) and NOTIFY (peripheral notifies central of
+      its state). State byte encoding: bit 0 = ACTIVE flag, bit 1 =
+      BATTERY_BELOW_CUTOFF flag, other bits reserved. Receivers raise
+      zmk_split_remote_smart_idle_state_changed events that external
+      modules (e.g. zmk-ext-power-smart-idle) can subscribe to for
+      cross-half coordination.
+
 if !ZMK_SPLIT_ROLE_CENTRAL
 
 config ZMK_SPLIT_BLE_PERIPHERAL_STACK_SIZE

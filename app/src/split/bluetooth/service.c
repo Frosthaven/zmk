@@ -36,6 +36,10 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/events/central_battery_state_changed.h>
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
 
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
+#include <zmk/events/split_remote_smart_idle_state_changed.h>
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
+
 #include <zmk/events/sensor_event.h>
 #include <zmk/sensors.h>
 
@@ -135,6 +139,73 @@ static ssize_t split_svc_update_central_battery(struct bt_conn *conn,
 }
 
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
+
+/* The single characteristic carries the local half's state both ways:
+ * central writes its state to peripheral via WRITE_WITHOUT_RESP, and
+ * peripheral notifies its state to central. Encoding per byte:
+ *   bit 0 = ACTIVE flag (1 = remote half is currently active)
+ *   bit 1 = BATTERY_BELOW_CUTOFF flag
+ *   bits 2..7 reserved.
+ * Both halves expose the characteristic so either side can be central
+ * with a reversed split layout. */
+static uint8_t smart_idle_remote_state = 0;
+static uint8_t smart_idle_local_state = 0;
+
+static void split_svc_smart_idle_state_callback(struct k_work *work) {
+    const uint8_t state = smart_idle_remote_state;
+    LOG_DBG("Raising remote smart-idle state changed: 0x%02x", state);
+    raise_zmk_split_remote_smart_idle_state_changed(
+        (struct zmk_split_remote_smart_idle_state_changed){
+            .active               = (state & 0x01) != 0,
+            .battery_below_cutoff = (state & 0x02) != 0,
+        });
+}
+
+static K_WORK_DEFINE(split_svc_smart_idle_state_work, split_svc_smart_idle_state_callback);
+
+static ssize_t split_svc_write_smart_idle_state(struct bt_conn *conn,
+                                                const struct bt_gatt_attr *attr,
+                                                const void *buf, uint16_t len, uint16_t offset,
+                                                uint8_t flags) {
+    if (offset + len > sizeof(smart_idle_remote_state)) {
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    }
+    memcpy((uint8_t *)&smart_idle_remote_state + offset, buf, len);
+    k_work_submit(&split_svc_smart_idle_state_work);
+    return len;
+}
+
+static ssize_t split_svc_read_smart_idle_state(struct bt_conn *conn,
+                                               const struct bt_gatt_attr *attrs, void *buf,
+                                               uint16_t len, uint16_t offset) {
+    return bt_gatt_attr_read(conn, attrs, buf, len, offset, &smart_idle_local_state,
+                             sizeof(smart_idle_local_state));
+}
+
+static void split_svc_smart_idle_state_ccc(const struct bt_gatt_attr *attr, uint16_t value) {
+    LOG_DBG("value %d", value);
+}
+
+/* Peripheral-side: notify the central of the local half's smart-idle
+ * state. Encodes (active, battery_below_cutoff) into a single byte and
+ * writes through bt_gatt_notify_uuid so callers don't have to know the
+ * characteristic's attribute index inside split_svc. The byte is also
+ * stashed in smart_idle_local_state so a fresh subscriber can read it.
+ *
+ * On the central role this is a no-op (the central writes its state via
+ * zmk_split_central_set_central_smart_idle_state() instead). Both APIs
+ * accept the same encoding so the smart-idle module can share its byte
+ * computation. */
+int zmk_split_bt_service_notify_smart_idle_state(uint8_t state) {
+    smart_idle_local_state = state;
+    return bt_gatt_notify_uuid(NULL,
+                               BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SMART_IDLE_STATE_UUID),
+                               split_svc.attrs, &state, sizeof(state));
+}
+
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
 
 static uint8_t selected_phys_layout = 0;
 
@@ -239,6 +310,16 @@ BT_GATT_SERVICE_DEFINE(
                                BT_GATT_CHRC_WRITE_WITHOUT_RESP, BT_GATT_PERM_WRITE_ENCRYPT, NULL,
                                split_svc_update_central_battery, NULL),
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
+        BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SMART_IDLE_STATE_UUID),
+                               BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY |
+                                   BT_GATT_CHRC_WRITE_WITHOUT_RESP,
+                               BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT,
+                               split_svc_read_smart_idle_state,
+                               split_svc_write_smart_idle_state, &smart_idle_local_state),
+        BT_GATT_CCC(split_svc_smart_idle_state_ccc,
+                    BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
     BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_SELECT_PHYS_LAYOUT_UUID),
                            BT_GATT_CHRC_WRITE | BT_GATT_CHRC_READ,
                            BT_GATT_PERM_WRITE_ENCRYPT | BT_GATT_PERM_READ_ENCRYPT,

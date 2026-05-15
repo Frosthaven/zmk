@@ -24,6 +24,9 @@
 #include <zmk/event_manager.h>
 #include <zmk/events/activity_state_changed.h>
 #include <zmk/events/usb_conn_state_changed.h>
+#if IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW_STATE_EVENT)
+#include <zmk/events/rgb_underglow_state_changed.h>
+#endif
 #include <zmk/workqueue.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
@@ -297,6 +300,17 @@ int zmk_rgb_underglow_get_state(bool *on_off) {
     return 0;
 }
 
+#if IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW_STATE_EVENT)
+static inline void rgb_underglow_emit_state_event(void) {
+    raise_zmk_rgb_underglow_state_changed((struct zmk_rgb_underglow_state_changed){
+        .on         = state.on,
+        .brightness = state.color.b,
+    });
+}
+#else
+static inline void rgb_underglow_emit_state_event(void) {}
+#endif
+
 int zmk_rgb_underglow_on(void) {
     if (!led_strip)
         return -ENODEV;
@@ -314,7 +328,9 @@ int zmk_rgb_underglow_on(void) {
     state.animation_step = 0;
     k_timer_start(&underglow_tick, K_NO_WAIT, K_MSEC(50));
 
-    return zmk_rgb_underglow_save_state();
+    int rc = zmk_rgb_underglow_save_state();
+    rgb_underglow_emit_state_event();
+    return rc;
 }
 
 static void zmk_rgb_underglow_off_handler(struct k_work *work) {
@@ -345,7 +361,9 @@ int zmk_rgb_underglow_off(void) {
     k_timer_stop(&underglow_tick);
     state.on = false;
 
-    return zmk_rgb_underglow_save_state();
+    int rc = zmk_rgb_underglow_save_state();
+    rgb_underglow_emit_state_event();
+    return rc;
 }
 
 int zmk_rgb_underglow_calc_effect(int direction) {
@@ -381,6 +399,20 @@ int zmk_rgb_underglow_set_hsb(struct zmk_led_hsb color) {
 
     state.color = color;
 
+    rgb_underglow_emit_state_event();
+    return 0;
+}
+
+/* Same as zmk_rgb_underglow_set_hsb but suppresses the state-changed
+ * event. Used by modules (e.g. the smart-idle brightness cap) that
+ * need to mutate brightness as part of their own response to a state
+ * event without recursing back into their own listener. */
+int zmk_rgb_underglow_set_hsb_silent(struct zmk_led_hsb color) {
+    if (color.h > HUE_MAX || color.s > SAT_MAX || color.b > BRT_MAX) {
+        return -ENOTSUP;
+    }
+
+    state.color = color;
     return 0;
 }
 
@@ -422,7 +454,9 @@ int zmk_rgb_underglow_change_hue(int direction) {
 
     state.color = zmk_rgb_underglow_calc_hue(direction);
 
-    return zmk_rgb_underglow_save_state();
+    int rc = zmk_rgb_underglow_save_state();
+    rgb_underglow_emit_state_event();
+    return rc;
 }
 
 int zmk_rgb_underglow_change_sat(int direction) {
@@ -431,7 +465,9 @@ int zmk_rgb_underglow_change_sat(int direction) {
 
     state.color = zmk_rgb_underglow_calc_sat(direction);
 
-    return zmk_rgb_underglow_save_state();
+    int rc = zmk_rgb_underglow_save_state();
+    rgb_underglow_emit_state_event();
+    return rc;
 }
 
 int zmk_rgb_underglow_change_brt(int direction) {
@@ -440,7 +476,9 @@ int zmk_rgb_underglow_change_brt(int direction) {
 
     state.color = zmk_rgb_underglow_calc_brt(direction);
 
-    return zmk_rgb_underglow_save_state();
+    int rc = zmk_rgb_underglow_save_state();
+    rgb_underglow_emit_state_event();
+    return rc;
 }
 
 int zmk_rgb_underglow_change_spd(int direction) {
