@@ -188,23 +188,6 @@ static void split_svc_smart_idle_state_ccc(const struct bt_gatt_attr *attr, uint
     LOG_DBG("value %d", value);
 }
 
-/* Peripheral-side: notify the central of the local half's smart-idle
- * state. Encodes (active, battery_below_cutoff) into a single byte and
- * writes through bt_gatt_notify_uuid so callers don't have to know the
- * characteristic's attribute index inside split_svc. The byte is also
- * stashed in smart_idle_local_state so a fresh subscriber can read it.
- *
- * On the central role this is a no-op (the central writes its state via
- * zmk_split_central_set_central_smart_idle_state() instead). Both APIs
- * accept the same encoding so the smart-idle module can share its byte
- * computation. */
-int zmk_split_bt_service_notify_smart_idle_state(uint8_t state) {
-    smart_idle_local_state = state;
-    return bt_gatt_notify_uuid(NULL,
-                               BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SMART_IDLE_STATE_UUID),
-                               split_svc.attrs, &state, sizeof(state));
-}
-
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
 
 static uint8_t selected_phys_layout = 0;
@@ -325,6 +308,21 @@ BT_GATT_SERVICE_DEFINE(
                            BT_GATT_PERM_WRITE_ENCRYPT | BT_GATT_PERM_READ_ENCRYPT,
                            split_svc_get_selected_phys_layout, split_svc_select_phys_layout,
                            NULL), );
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
+/* Peripheral-side: notify the central of the local half's smart-idle
+ * state. State byte encoding: bit 0 = ACTIVE, bit 1 = BATTERY_BELOW_CUTOFF.
+ * Uses bt_gatt_notify_uuid so callers don't have to know the
+ * characteristic's attribute index inside split_svc. The byte is also
+ * stashed in smart_idle_local_state so a fresh subscriber can read it.
+ * Defined after BT_GATT_SERVICE_DEFINE so split_svc is in scope. */
+int zmk_split_bt_service_notify_smart_idle_state(uint8_t state) {
+    smart_idle_local_state = state;
+    return bt_gatt_notify_uuid(NULL,
+                               BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SMART_IDLE_STATE_UUID),
+                               split_svc.attrs, &state, sizeof(state));
+}
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
 
 K_THREAD_STACK_DEFINE(service_q_stack, CONFIG_ZMK_SPLIT_BLE_PERIPHERAL_STACK_SIZE);
 
