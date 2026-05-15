@@ -49,6 +49,46 @@ static uint8_t last_state_of_charge = 0;
 
 uint8_t zmk_battery_state_of_charge(void) { return last_state_of_charge; }
 
+#if IS_ENABLED(CONFIG_ZMK_BATTERY_MONOTONIC_REPORTING)
+/* Cached lowest reading since the last USB plug-in. 0xFF = no reading
+ * yet, accept whatever the next sample produces. Reset to 0xFF when
+ * USB is connected so the next discharge cycle starts fresh. */
+static uint8_t battery_monotonic_floor = 0xFF;
+
+static inline bool battery_usb_is_currently_powered(void) {
+#if defined(ZMK_BATTERY_ENCODE_PERIPHERAL_CHARGING)
+    return nrf_power_usbregstatus_vbusdet_get(NRF_POWER);
+#elif IS_ENABLED(CONFIG_ZMK_USB)
+    return zmk_usb_is_powered();
+#else
+    return false;
+#endif
+}
+
+static uint8_t battery_apply_monotonic(uint8_t raw_pct) {
+    if (battery_usb_is_currently_powered()) {
+        /* Charging or plugged in - allow upward changes and reset the
+         * floor so the next discharge starts at the current reading. */
+        battery_monotonic_floor = raw_pct;
+        return raw_pct;
+    }
+    if (battery_monotonic_floor == 0xFF || raw_pct < battery_monotonic_floor) {
+        battery_monotonic_floor = raw_pct;
+    }
+    return battery_monotonic_floor;
+}
+
+/* Reset the floor as soon as USB plug-in is detected (peripheral side
+ * calls this from the nrfx_power ISR helper; central side wires a ZMK
+ * event listener below). Without an explicit reset the floor would
+ * stay stale until the next periodic battery poll - up to a minute on
+ * default settings - which could clamp a freshly-charged level back
+ * down to the pre-charge value. */
+static inline void battery_reset_monotonic_floor(void) {
+    battery_monotonic_floor = 0xFF;
+}
+#endif
+
 #if IS_ENABLED(CONFIG_BT_BAS)
 // Push last_state_of_charge to the BAS characteristic. On peripheral builds,
 // bit 7 of the transmitted byte carries the USB-powered flag so the central
@@ -91,6 +131,9 @@ static void peripheral_usb_evt_handler(nrfx_power_usb_evt_t event) {
                                   K_SECONDS(5));
     } else if (event == NRFX_POWER_USB_EVT_DETECTED) {
         k_work_cancel_delayable(&battery_relax_work);
+#if IS_ENABLED(CONFIG_ZMK_BATTERY_MONOTONIC_REPORTING)
+        battery_reset_monotonic_floor();
+#endif
     }
     k_work_submit_to_queue(zmk_workqueue_lowprio_work_q(), &peripheral_usb_publish_work);
 }
@@ -175,6 +218,10 @@ static int zmk_battery_update(const struct device *battery) {
     LOG_DBG("State of change %d from %d mv", state_of_charge.val1, mv);
 #else
 #error "Not a supported reporting fetch mode"
+#endif
+
+#if IS_ENABLED(CONFIG_ZMK_BATTERY_MONOTONIC_REPORTING)
+    state_of_charge.val1 = battery_apply_monotonic((uint8_t)state_of_charge.val1);
 #endif
 
     if (last_state_of_charge != state_of_charge.val1) {
@@ -284,6 +331,9 @@ static int battery_event_listener(const zmk_event_t *eh) {
     if (as_zmk_usb_conn_state_changed(eh)) {
         if (zmk_usb_is_powered()) {
             k_work_cancel_delayable(&battery_relax_work);
+#if IS_ENABLED(CONFIG_ZMK_BATTERY_MONOTONIC_REPORTING)
+            battery_reset_monotonic_floor();
+#endif
         } else {
             k_work_schedule_for_queue(zmk_workqueue_lowprio_work_q(), &battery_relax_work,
                                       K_SECONDS(5));

@@ -397,6 +397,17 @@ config ZMK_BATTERY_REPORTING_FETCH_MODE_LITHIUM_VOLTAGE
 
 endchoice
 
+config ZMK_BATTERY_MONOTONIC_REPORTING
+    bool "Only allow battery percentage to decrease while on battery"
+    default n
+    help
+      Suppresses small upward jitter in the reported battery percentage
+      caused by LiPo cell voltage relaxation when load drops (e.g. when
+      RGB fades off, activity goes idle, or BLE quiets down). While on
+      battery, the reported percentage is capped at the lowest value
+      seen since the last USB plug-in. When USB is connected, the cap
+      is released so the reading can rise during charging.
+
 endif # ZMK_BATTERY_REPORTING
 
 config ZMK_IDLE_TIMEOUT
