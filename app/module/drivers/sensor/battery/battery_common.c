@@ -45,17 +45,24 @@ uint8_t lithium_ion_mv_to_pct(int16_t bat_mv) {
     // cells (common in split-keyboard builds). The prior values read ~8-12 pp
     // low in the 60-80% band; vendor spread is ±20-30 mV through here so the
     // new table fits most 403450 stock within a single % at idle draw.
+    //
+    // Top of curve additionally shifted down ~50 mV so a freshly-charged cell
+    // (typical post-charge ADC reading ~4140-4180 mV after divider + ADC
+    // tolerance, charge IC termination, and cell relaxation) reaches the 100%
+    // anchor instead of capping at ~95% the user reads as "broken". Bottom
+    // anchors (5% and 0%) stay pinned at original voltages so the BATTERY
+    // CUTOFF threshold still fires at the right cell voltage.
     static const struct lookup_point battery_lookup[] = {
-        {.millivolts = 4200, .percent = 100},
-        {.millivolts = 4120, .percent = 90},
-        {.millivolts = 4060, .percent = 80},
-        {.millivolts = 3990, .percent = 70},
-        {.millivolts = 3920, .percent = 60},
-        {.millivolts = 3850, .percent = 50},
-        {.millivolts = 3800, .percent = 40},
-        {.millivolts = 3770, .percent = 30},
-        {.millivolts = 3730, .percent = 20},
-        {.millivolts = 3680, .percent = 10},
+        {.millivolts = 4150, .percent = 100},
+        {.millivolts = 4070, .percent = 90},
+        {.millivolts = 4010, .percent = 80},
+        {.millivolts = 3940, .percent = 70},
+        {.millivolts = 3870, .percent = 60},
+        {.millivolts = 3800, .percent = 50},
+        {.millivolts = 3750, .percent = 40},
+        {.millivolts = 3720, .percent = 30},
+        {.millivolts = 3680, .percent = 20},
+        {.millivolts = 3630, .percent = 10},
         {.millivolts = 3600, .percent = 5},
         {.millivolts = 3450, .percent = 0},
     };
