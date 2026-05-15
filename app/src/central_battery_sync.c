@@ -25,6 +25,17 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 static uint8_t last_sent_state = 0xFF;
 
+/* Bypass the dedup for this many ms after a USB unplug. The peripheral
+ * widget marks the central-battery cell as stale (".." placeholder) on
+ * the charging→not transition; it only clears stale on the next
+ * central-battery event. Battery percentage often doesn't move between
+ * the unplug write and the post-relax sample 5 s later, so without an
+ * explicit bypass the dedup would drop the post-relax send and the
+ * peripheral would stay on ".." until the level finally moved (could
+ * be minutes). 10 s window covers the 5 s relax with margin. */
+#define DEDUP_BYPASS_WINDOW_MS 10000
+static int64_t dedup_bypass_until = 0;
+
 static void mirror_central_battery_state(void) {
     uint8_t level = zmk_battery_state_of_charge() & 0x7F;
     uint8_t state = level;
@@ -34,7 +45,8 @@ static void mirror_central_battery_state(void) {
     }
 #endif
 
-    if (state == last_sent_state) {
+    bool bypass = k_uptime_get() < dedup_bypass_until;
+    if (state == last_sent_state && !bypass) {
         return;
     }
     last_sent_state = state;
@@ -63,6 +75,15 @@ void zmk_split_central_resend_central_battery_state(void) {
 }
 
 static int central_battery_sync_cb(const zmk_event_t *eh) {
+#if IS_ENABLED(CONFIG_ZMK_USB)
+    /* Open a dedup-bypass window on the unplug transition so the
+     * forced battery_state_changed event from battery_relax_work
+     * (~5 s later) produces a fresh write to the peripheral even when
+     * the percentage byte happens to be unchanged. */
+    if (as_zmk_usb_conn_state_changed(eh) && !zmk_usb_is_powered()) {
+        dedup_bypass_until = k_uptime_get() + DEDUP_BYPASS_WINDOW_MS;
+    }
+#endif
     mirror_central_battery_state();
     return ZMK_EV_EVENT_BUBBLE;
 }
