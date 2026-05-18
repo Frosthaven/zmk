@@ -399,8 +399,16 @@ int zmk_rgb_underglow_set_hsb(struct zmk_led_hsb color) {
 
     state.color = color;
 
+    /* Persist like the change_{hue,sat,brt} siblings do. On a split
+     * keyboard, every relative RGB binding (RGB_HUI/HUD/SAI/SAD/BRI/BRD)
+     * is rewritten to RGB_COLOR_HSB_CMD by binding_convert_central_state
+     * and dispatched through this function, so without a save call here
+     * none of those changes ever reach NVS. Modules that need to mutate
+     * brightness without persisting (e.g. smart-idle's clamp/fade) use
+     * zmk_rgb_underglow_set_hsb_silent() instead. */
+    int rc = zmk_rgb_underglow_save_state();
     rgb_underglow_emit_state_event();
-    return 0;
+    return rc;
 }
 
 /* Same as zmk_rgb_underglow_set_hsb but suppresses the state-changed
