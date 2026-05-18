@@ -28,3 +28,11 @@ int zmk_rgb_underglow_change_brt(int direction);
 int zmk_rgb_underglow_change_spd(int direction);
 int zmk_rgb_underglow_set_hsb(struct zmk_led_hsb color);
 int zmk_rgb_underglow_set_hsb_silent(struct zmk_led_hsb color);
+
+#if IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW_RUNTIME_CAP)
+/* Soft render-layer brightness cap. Lower this from a module to clamp
+ * the visual brightness without mutating state.color.b. BRT_MAX = no
+ * cap (default). */
+void zmk_rgb_underglow_set_runtime_max_brightness(uint8_t max);
+uint8_t zmk_rgb_underglow_get_runtime_max_brightness(void);
+#endif

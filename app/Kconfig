@@ -345,6 +345,18 @@ config ZMK_RGB_UNDERGLOW_STATE_EVENT
       Default off so that adding the event does not affect builds that
       don't subscribe to it.
 
+config ZMK_RGB_UNDERGLOW_RUNTIME_CAP
+    bool "Allow modules to set a runtime brightness cap at the render layer"
+    help
+      Adds a soft per-frame brightness cap that modules can lower at
+      runtime via zmk_rgb_underglow_set_runtime_max_brightness(). The
+      LED render path will clamp the rendered brightness to this value
+      without mutating state.color.b, so a brightness key press still
+      accumulates into state.color and persists to NVS at its real
+      value - only the visual output is clamped. Default off; default
+      cap value (when compiled in) is BRT_MAX so unused behaviour
+      matches stock ZMK exactly.
+
 endif # ZMK_RGB_UNDERGLOW
 
 menuconfig ZMK_BACKLIGHT

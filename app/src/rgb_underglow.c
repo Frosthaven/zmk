@@ -73,13 +73,42 @@ static struct rgb_underglow_state state;
 static const struct device *const ext_power = DEVICE_DT_GET(DT_INST(0, zmk_ext_power_generic));
 #endif
 
+#if IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW_RUNTIME_CAP)
+/* Render-time brightness cap. A module (e.g. zmk-ext-power-smart-idle)
+ * can lower this to enforce a soft visual maximum (such as the
+ * battery-time RGB cap) WITHOUT mutating state.color.b. That way the
+ * user's pressed-up brightness still accumulates in state.color.b and
+ * still persists to NVS at its real value - the cap only affects what
+ * the LED strip is actually driven at. Default = BRT_MAX so unset
+ * behaviour matches stock ZMK. */
+static uint8_t runtime_max_brightness = BRT_MAX;
+
+void zmk_rgb_underglow_set_runtime_max_brightness(uint8_t max) {
+    runtime_max_brightness = max;
+}
+
+uint8_t zmk_rgb_underglow_get_runtime_max_brightness(void) {
+    return runtime_max_brightness;
+}
+#endif
+
 static struct zmk_led_hsb hsb_scale_min_max(struct zmk_led_hsb hsb) {
+#if IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW_RUNTIME_CAP)
+    if (hsb.b > runtime_max_brightness) {
+        hsb.b = runtime_max_brightness;
+    }
+#endif
     hsb.b = CONFIG_ZMK_RGB_UNDERGLOW_BRT_MIN +
             (CONFIG_ZMK_RGB_UNDERGLOW_BRT_MAX - CONFIG_ZMK_RGB_UNDERGLOW_BRT_MIN) * hsb.b / BRT_MAX;
     return hsb;
 }
 
 static struct zmk_led_hsb hsb_scale_zero_max(struct zmk_led_hsb hsb) {
+#if IS_ENABLED(CONFIG_ZMK_RGB_UNDERGLOW_RUNTIME_CAP)
+    if (hsb.b > runtime_max_brightness) {
+        hsb.b = runtime_max_brightness;
+    }
+#endif
     hsb.b = hsb.b * CONFIG_ZMK_RGB_UNDERGLOW_BRT_MAX / BRT_MAX;
     return hsb;
 }
