@@ -309,6 +309,20 @@ static int zmk_battery_init(void) {
     }
 
     zmk_battery_start_reporting();
+
+#if defined(ZMK_BATTERY_RELAX_AFTER_UNPLUG)
+    /* Cold-boot transient: the very first poll happens before RGB / BLE /
+     * display have ramped up, so the ADC reads the cell's relaxed
+     * open-circuit voltage and the widget renders an inflated %.
+     * Schedule a fresh poll a few seconds out so the load is fully
+     * ramped by the time we re-sample - the monotonic floor then lands
+     * on a realistic loaded value and the widget snaps to it. Reuses
+     * the existing relax handler that already covers the post-USB-
+     * unplug version of the same artifact. */
+    k_work_schedule_for_queue(zmk_workqueue_lowprio_work_q(), &battery_relax_work,
+                              K_SECONDS(5));
+#endif
+
     return 0;
 }
 
