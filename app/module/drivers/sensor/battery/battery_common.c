@@ -46,15 +46,18 @@ uint8_t lithium_ion_mv_to_pct(int16_t bat_mv) {
     // low in the 60-80% band; vendor spread is ±20-30 mV through here so the
     // new table fits most 403450 stock within a single % at idle draw.
     //
-    // Top of curve additionally shifted down ~50 mV so a freshly-charged cell
-    // (typical post-charge ADC reading ~4140-4180 mV after divider + ADC
-    // tolerance, charge IC termination, and cell relaxation) reaches the 100%
-    // anchor instead of capping at ~95% the user reads as "broken". Bottom
-    // anchors (5% and 0%) stay pinned at original voltages so the BATTERY
-    // CUTOFF threshold still fires at the right cell voltage.
+    // Top of curve shifted down to 4080 mV = 100%. A full cell is sampled
+    // UNDER LOAD a few seconds after charge/boot (RGB + BLE up), so its reading
+    // sags below open-circuit and, combined with ~+-2% ADC/divider tolerance
+    // (~+-80 mV) and post-charge relaxation, straddled the old 4150 mV anchor --
+    // giving an unreliable 97-100%. 4080 mV sits ~46 mV below the observed full
+    // reading (~4126 mV) so a full cell lands on 100% every time; the monotonic
+    // filter then locks 100. Trade-off: 4080-4200 mV all read 100 (a small
+    // plateau at the top). Bottom anchors (5% and 0%) stay pinned at their
+    // original voltages so the BATTERY CUTOFF threshold still fires correctly.
     static const struct lookup_point battery_lookup[] = {
-        {.millivolts = 4150, .percent = 100},
-        {.millivolts = 4070, .percent = 90},
+        {.millivolts = 4080, .percent = 100},
+        {.millivolts = 4030, .percent = 90},
         {.millivolts = 4010, .percent = 80},
         {.millivolts = 3940, .percent = 70},
         {.millivolts = 3870, .percent = 60},
