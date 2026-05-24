@@ -180,6 +180,41 @@ int zmk_split_central_update_central_battery(uint8_t state) {
 
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
 
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+
+int zmk_split_central_update_central_status(uint8_t layer, uint8_t profile,
+                                            uint8_t profile_bonded, uint8_t wpm, uint8_t flags) {
+    if (!active_transport || !active_transport->api ||
+        !active_transport->api->get_available_source_ids || !active_transport->api->send_command) {
+        return -ENODEV;
+    }
+
+    uint8_t source_ids[ZMK_SPLIT_CENTRAL_PERIPHERAL_COUNT];
+    int ret = active_transport->api->get_available_source_ids(source_ids);
+    if (ret < 0) {
+        return ret;
+    }
+
+    struct zmk_split_transport_central_command command = {
+        .type = ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_CENTRAL_STATUS,
+        .data = {.set_central_status = {.layer = layer,
+                                        .profile = profile,
+                                        .profile_bonded = profile_bonded,
+                                        .wpm = wpm,
+                                        .flags = flags}},
+    };
+
+    for (size_t i = 0; i < ret; i++) {
+        int send_ret = active_transport->api->send_command(source_ids[i], command);
+        if (send_ret < 0) {
+            return send_ret;
+        }
+    }
+    return 0;
+}
+
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
 
 int zmk_split_central_set_central_smart_idle_state(uint8_t state) {

@@ -189,6 +189,10 @@ static ssize_t get_payload_data_size(const struct zmk_split_transport_central_co
         return sizeof(cmd->data.set_central_battery_state);
     case ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_SMART_IDLE_STATE:
         return sizeof(cmd->data.set_smart_idle_state);
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+    case ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_CENTRAL_STATUS:
+        return sizeof(cmd->data.set_central_status);
+#endif
     default:
         return -ENOTSUP;
     }

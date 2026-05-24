@@ -68,6 +68,7 @@ enum zmk_split_transport_central_command_type {
     ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_HID_INDICATORS,
     ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_CENTRAL_BATTERY_STATE,
     ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_SMART_IDLE_STATE,
+    ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_CENTRAL_STATUS,
 } __packed;
 
 struct zmk_split_transport_central_command {
@@ -97,5 +98,13 @@ struct zmk_split_transport_central_command {
         struct {
             uint8_t state;
         } set_smart_idle_state;
+
+        struct {
+            uint8_t layer;         // highest active layer index
+            uint8_t profile;       // active BLE profile index
+            uint8_t profile_bonded; // bitmap: bit i set = profile i bonded
+            uint8_t wpm;           // current words-per-minute
+            uint8_t flags;         // bit0 caps, bit1 active-connected, bit2 endpoint-usb
+        } set_central_status;
     } data;
 } __packed;

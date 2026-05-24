@@ -87,6 +87,16 @@ config ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR
       both cells. Encoding: bits 0..6 = state-of-charge, bit 7 = USB
       powered (same scheme the peripheral uses going the other way).
 
+config ZMK_SPLIT_CENTRAL_STATUS_MIRROR
+    bool "Mirror central status (layer/profile/WPM/caps) to peripherals"
+    help
+      Adds a split-service characteristic the central writes to with its
+      keymap status (active layer, BLE profile + bonded bitmap, WPM, caps
+      lock). Lets a peripheral-side widget render the central's status
+      screen, e.g. when the central has a trackpad and no display of its
+      own. The peripheral resolves the layer name from its own keymap, so
+      only the index is sent.
+
 config ZMK_SPLIT_BLE_SMART_IDLE_SYNC
     bool "Share smart-idle state (activity + battery cutoff) across halves"
     help

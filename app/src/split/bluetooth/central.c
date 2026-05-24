@@ -69,6 +69,9 @@ struct peripheral_slot {
     uint16_t update_smart_idle_state;
     struct bt_gatt_subscribe_params smart_idle_subscribe_params;
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+    uint16_t update_central_status;
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
     uint16_t selected_physical_layout_handle;
     uint8_t position_state[POSITION_STATE_DATA_LEN];
     uint8_t changed_positions[POSITION_STATE_DATA_LEN];
@@ -236,6 +239,9 @@ int release_peripheral_slot(int index) {
     slot->update_smart_idle_state = 0;
     slot->smart_idle_subscribe_params.value_handle = 0;
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+    slot->update_central_status = 0;
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
 
     return 0;
 }
@@ -671,6 +677,13 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
             slot->update_central_battery = bt_gatt_attr_value_handle(attr);
             zmk_split_central_resend_central_battery_state();
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+        } else if (!bt_uuid_cmp(((struct bt_gatt_chrc *)attr->user_data)->uuid,
+                                BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_CENTRAL_STATUS_UUID))) {
+            LOG_DBG("Found update central status handle");
+            slot->update_central_status = bt_gatt_attr_value_handle(attr);
+            zmk_split_central_resend_central_status();
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
         } else if (!bt_uuid_cmp(((struct bt_gatt_chrc *)attr->user_data)->uuid,
                                 BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SMART_IDLE_STATE_UUID))) {
@@ -1184,6 +1197,23 @@ void split_central_split_run_callback(struct k_work *work) {
             break;
         }
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+        case ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_CENTRAL_STATUS: {
+            if (peripherals[payload_wrapper.source].update_central_status == 0) {
+                LOG_DBG("Central status handle not yet discovered on peripheral");
+                break;
+            }
+            int cs_err = bt_gatt_write_without_response(
+                peripherals[payload_wrapper.source].conn,
+                peripherals[payload_wrapper.source].update_central_status,
+                &payload_wrapper.cmd.data.set_central_status,
+                sizeof(payload_wrapper.cmd.data.set_central_status), true);
+            if (cs_err) {
+                LOG_ERR("Failed to write central status characteristic (err %d)", cs_err);
+            }
+            break;
+        }
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
         case ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_SMART_IDLE_STATE: {
             if (peripherals[payload_wrapper.source].update_smart_idle_state == 0) {
@@ -1287,6 +1317,9 @@ static int split_central_bt_send_command(uint8_t source,
     case ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_CENTRAL_BATTERY_STATE:
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
     case ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_SMART_IDLE_STATE:
+#endif
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+    case ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_SET_CENTRAL_STATUS:
 #endif
     case ZMK_SPLIT_TRANSPORT_CENTRAL_CMD_TYPE_INVOKE_BEHAVIOR: {
         struct central_cmd_wrapper wrapper = {.source = source, .cmd = cmd};

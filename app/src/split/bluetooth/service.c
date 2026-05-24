@@ -36,6 +36,10 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/events/central_battery_state_changed.h>
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
 
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+#include <zmk/events/central_status_changed.h>
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
 #include <zmk/events/split_remote_smart_idle_state_changed.h>
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
@@ -139,6 +143,48 @@ static ssize_t split_svc_update_central_battery(struct bt_conn *conn,
 }
 
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+
+struct central_status_buf {
+    uint8_t layer;
+    uint8_t profile;
+    uint8_t profile_bonded;
+    uint8_t wpm;
+    uint8_t flags;
+} __packed;
+
+static struct central_status_buf central_status = {0};
+
+static void split_svc_central_status_callback(struct k_work *work) {
+    const struct central_status_buf s = central_status;
+    LOG_DBG("Raising central status changed event: layer=%d profile=%d wpm=%d flags=0x%02x", s.layer,
+            s.profile, s.wpm, s.flags);
+    raise_zmk_central_status_changed((struct zmk_central_status_changed){
+        .layer                   = s.layer,
+        .profile                 = s.profile,
+        .profile_bonded          = s.profile_bonded,
+        .wpm                     = s.wpm,
+        .caps_lock               = (s.flags & 0x01) != 0,
+        .active_profile_connected = (s.flags & 0x02) != 0,
+        .endpoint_usb            = (s.flags & 0x04) != 0,
+    });
+}
+
+static K_WORK_DEFINE(split_svc_central_status_work, split_svc_central_status_callback);
+
+static ssize_t split_svc_update_central_status(struct bt_conn *conn,
+                                               const struct bt_gatt_attr *attr, const void *buf,
+                                               uint16_t len, uint16_t offset, uint8_t flags) {
+    if (offset + len > sizeof(central_status)) {
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    }
+    memcpy((uint8_t *)&central_status + offset, buf, len);
+    k_work_submit(&split_svc_central_status_work);
+    return len;
+}
+
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
 
@@ -293,6 +339,11 @@ BT_GATT_SERVICE_DEFINE(
                                BT_GATT_CHRC_WRITE_WITHOUT_RESP, BT_GATT_PERM_WRITE_ENCRYPT, NULL,
                                split_svc_update_central_battery, NULL),
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+        BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_CENTRAL_STATUS_UUID),
+                               BT_GATT_CHRC_WRITE_WITHOUT_RESP, BT_GATT_PERM_WRITE_ENCRYPT, NULL,
+                               split_svc_update_central_status, NULL),
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
         BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SMART_IDLE_STATE_UUID),
                                BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY |

@@ -60,6 +60,20 @@ void zmk_split_central_resend_central_battery_state(void);
 
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR)
 
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+
+/* Push the central's keymap status to peripherals. flags: bit0 caps lock,
+ * bit1 active profile connected, bit2 selected endpoint is USB. */
+int zmk_split_central_update_central_status(uint8_t layer, uint8_t profile,
+                                            uint8_t profile_bonded, uint8_t wpm, uint8_t flags);
+
+/* Invalidate the outgoing-status cache and re-send. Call when a peripheral's
+ * central-status handle is freshly discovered so it doesn't wait for the next
+ * status change. */
+void zmk_split_central_resend_central_status(void);
+
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
+
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
 
 /* Central-side: write the central's own smart-idle state to all

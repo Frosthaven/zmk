@@ -102,6 +102,13 @@ if (CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_MIRROR AND CONFIG_ZMK_SPLIT_ROLE_CENTRA
     target_sources(app PRIVATE src/central_battery_sync.c)
 endif()
 
+target_sources_ifdef(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR app PRIVATE
+    src/events/central_status_changed.c)
+# Central-only sender: gathers keymap status and pushes it to peripherals.
+if (CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR AND CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    target_sources(app PRIVATE src/central_status_sync.c)
+endif()
+
 target_sources_ifdef(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC app PRIVATE
     src/events/split_remote_smart_idle_state_changed.c)
 
