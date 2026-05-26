@@ -328,6 +328,25 @@ BT_GATT_SERVICE_DEFINE(
                            split_svc_sensor_state, NULL, &last_sensor_event),
     BT_GATT_CCC(split_svc_sensor_state_ccc, BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),
 #endif /* ZMK_KEYMAP_HAS_SENSORS */
+    /* Smart-idle MUST be discovered before the input-split characteristics.
+     * The central's input-split descriptor walk does not resume characteristic
+     * discovery to the chars placed after INPUT_SPLIT_CHARS, so a smart-idle
+     * char positioned after them is never discovered (update_smart_idle_state
+     * stays 0 and the central silently skips the cross-half wake write --
+     * confirmed via on-device logging). Ordering it here keeps it in the
+     * linear discovery phase. The central records the write handle but does
+     * NOT subscribe to its NOTIFY (see central.c), so this adds no CCC
+     * discovery to collide with the input walk. */
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SMART_IDLE_STATE_UUID),
+                           BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY |
+                               BT_GATT_CHRC_WRITE_WITHOUT_RESP,
+                           BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT,
+                           split_svc_read_smart_idle_state,
+                           split_svc_write_smart_idle_state, &smart_idle_local_state),
+    BT_GATT_CCC(split_svc_smart_idle_state_ccc,
+                BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),
+#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
     DT_FOREACH_STATUS_OKAY(zmk_input_split, INPUT_SPLIT_CHARS)
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
         BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_UPDATE_HID_INDICATORS_UUID),
@@ -344,16 +363,6 @@ BT_GATT_SERVICE_DEFINE(
                                BT_GATT_CHRC_WRITE_WITHOUT_RESP, BT_GATT_PERM_WRITE_ENCRYPT, NULL,
                                split_svc_update_central_status, NULL),
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_CENTRAL_STATUS_MIRROR)
-#if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
-        BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SMART_IDLE_STATE_UUID),
-                               BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY |
-                                   BT_GATT_CHRC_WRITE_WITHOUT_RESP,
-                               BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT,
-                               split_svc_read_smart_idle_state,
-                               split_svc_write_smart_idle_state, &smart_idle_local_state),
-        BT_GATT_CCC(split_svc_smart_idle_state_ccc,
-                    BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),
-#endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
     BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(ZMK_SPLIT_BT_SELECT_PHYS_LAYOUT_UUID),
                            BT_GATT_CHRC_WRITE | BT_GATT_CHRC_READ,
                            BT_GATT_PERM_WRITE_ENCRYPT | BT_GATT_PERM_READ_ENCRYPT,

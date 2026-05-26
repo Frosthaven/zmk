@@ -687,14 +687,23 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
         } else if (!bt_uuid_cmp(((struct bt_gatt_chrc *)attr->user_data)->uuid,
                                 BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SMART_IDLE_STATE_UUID))) {
-            LOG_DBG("Found smart-idle state handle");
+            LOG_DBG("Found smart-idle state handle (write-only)");
             slot->update_smart_idle_state = bt_gatt_attr_value_handle(attr);
             slot->smart_idle_subscribe_params.disc_params = &slot->sub_discover_params;
             slot->smart_idle_subscribe_params.end_handle = slot->discover_params.end_handle;
             slot->smart_idle_subscribe_params.value_handle = bt_gatt_attr_value_handle(attr);
             slot->smart_idle_subscribe_params.notify = split_central_smart_idle_state_notify_func;
             slot->smart_idle_subscribe_params.value = BT_GATT_CCC_NOTIFY;
-            split_central_subscribe(conn, &slot->smart_idle_subscribe_params);
+            /* Deliberately NOT subscribing to the peripheral's smart-idle NOTIFY.
+             * We only need update_smart_idle_state for the central->peripheral
+             * write; peripheral->central notify is redundant (a peripheral
+             * keypress already wakes the central via key forwarding). Issuing
+             * the subscribe here kicks off a CCC discovery on the shared
+             * sub_discover_params that collides with the input-split descriptor
+             * walk on trackpad builds and hangs the central. The params above
+             * are still populated so the `subscribed` gate's value_handle check
+             * passes and split_central_smart_idle_state_notify_func stays
+             * referenced. */
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_SMART_IDLE_SYNC)
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)
         } else if (!bt_uuid_cmp(((struct bt_gatt_chrc *)attr->user_data)->uuid,
